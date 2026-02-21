@@ -1,9 +1,18 @@
+#!/usr/bin/env node
+
 import { ScryfallList, ScryfallCard } from "@scryfall/api-types"
 
 import base_prompt from './prompt.js'
 import ollama from "ollama"
 
+const FILTER_MODEL = "qwen3:8b";
+
 const program_args = process.argv.slice(2);
+
+if(program_args.length == 0) {
+    console.log("Dredger v1.0.0");
+    process.exit();
+}
 
 const query_components: Array<string> = [];
 var llm_query = "";
@@ -100,7 +109,7 @@ async function process_card(card: ScryfallCard.Any) {
     const prompt = base_prompt.replace("$QUERY", llm_query).replace("$CARD", JSON.stringify(small));
 
     const resp = await ollama.chat({
-        model: "qwen3:8b",
+        model: FILTER_MODEL,
         messages: [{
             role: "user",
             content: prompt

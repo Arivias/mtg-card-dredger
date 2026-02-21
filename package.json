@@ -2,6 +2,9 @@
   "name": "mtg-card-dredger",
   "version": "1.0.0",
   "description": "",
+  "bin": {
+    "dredge": "dist/index.js"
+  },
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
