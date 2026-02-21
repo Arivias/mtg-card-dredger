@@ -10,7 +10,7 @@ var CARDS_PER_BATCH = 8
 
 const program_args = process.argv.slice(2);
 
-if(program_args.length == 0 || program_args.findIndex((v)=>v==="--help") !== -1) {
+if (program_args.length == 0 || program_args.findIndex((v) => v === "--help") !== -1) {
     console.log("Dredger v1.0.0");
     console.log(`usage: dredge [args]\n\t--model\t\tSet the filtering model (default:qen3:8b)\n\t--batchside\tThe number of cards per filtering batch (default:8)`)
     process.exit();
@@ -21,8 +21,8 @@ var llm_query = "";
 
 var setting_filter_model = false
 var setting_batchsize = false
-for(const arg of program_args) {
-    if(setting_filter_model) {
+for (const arg of program_args) {
+    if (setting_filter_model) {
         FILTER_MODEL = arg;
         setting_filter_model = false;
         continue;
@@ -32,7 +32,7 @@ for(const arg of program_args) {
         continue;
     }
 
-    if(arg.startsWith("??")) {
+    if (arg.startsWith("??")) {
         llm_query = arg.slice(2);
         continue;
     } else if (arg === "--model") {
@@ -55,8 +55,8 @@ var last_request_time: number;
 async function request_list(url: string): Promise<ScryfallList.Cards> {
     const now = Date.now();
 
-    const difference = (last_request_time+min_time_between_requests) - now;
-    if(difference > 0) {
+    const difference = (last_request_time + min_time_between_requests) - now;
+    if (difference > 0) {
         sleep(difference);
     }
 
@@ -95,8 +95,8 @@ function minimize_card(card: ScryfallCard.Any): SmallCard {
         faces: []
     };
 
-    if("card_faces" in card) {
-        for(const face of card.card_faces) {
+    if ("card_faces" in card) {
+        for (const face of card.card_faces) {
             out.faces.push({
                 name: face.name,
                 mana_cost: face.mana_cost,
@@ -120,12 +120,12 @@ function minimize_card(card: ScryfallCard.Any): SmallCard {
 
 var processing_buffer: Array<SmallCard> = [];
 async function process_buffer() {
-    if(processing_buffer.length === 0) {
+    if (processing_buffer.length === 0) {
         return;
     }
 
     var cards: Array<string> = [];
-    for(var i = 0; i < processing_buffer.length; i++) {
+    for (var i = 0; i < processing_buffer.length; i++) {
         cards.push(`${i}: ${JSON.stringify(processing_buffer[i])}`);
     }
 
@@ -141,10 +141,10 @@ async function process_buffer() {
 
     try {
         const selected = JSON.parse(resp.message.content);
-        for(const id of selected) {
+        for (const id of selected) {
             console.log(processing_buffer[id]);
         }
-    } catch(e) {
+    } catch (e) {
         console.error(e);
     } finally {
         processing_buffer = [];
@@ -154,12 +154,12 @@ async function process_buffer() {
 async function process_card(card: ScryfallCard.Any) {
     const small = minimize_card(card);
 
-    if(llm_query === "") {
+    if (llm_query === "") {
         console.log(small);
         return;
     }
 
-    if(processing_buffer.length === CARDS_PER_BATCH) {
+    if (processing_buffer.length === CARDS_PER_BATCH) {
         await process_buffer();
     }
 
@@ -169,12 +169,12 @@ async function process_card(card: ScryfallCard.Any) {
 const url_query = "https://api.scryfall.com/cards/search?q=" + query_components.join("+") + "&order=edhrec";
 
 var list = await request_list(url_query);
-while(true) {
-    for(const card of list.data) {
+while (true) {
+    for (const card of list.data) {
         await process_card(card);
     }
 
-    if(!list.has_more) {
+    if (!list.has_more) {
         await process_buffer();
         break;
     }
