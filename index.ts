@@ -5,21 +5,41 @@ import { ScryfallList, ScryfallCard } from "@scryfall/api-types"
 import base_prompt from './prompt.js'
 import ollama from "ollama"
 
-const FILTER_MODEL = "qwen3:8b";
+var FILTER_MODEL = "qwen3:8b";
+var CARDS_PER_BATCH = 8
 
 const program_args = process.argv.slice(2);
 
-if(program_args.length == 0) {
+if(program_args.length == 0 || program_args.findIndex((v)=>v==="--help") !== -1) {
     console.log("Dredger v1.0.0");
+    console.log(`usage: dredge [args]\n\t--model\t\tSet the filtering model (default:qen3:8b)\n\t--batchside\tThe number of cards per filtering batch (default:8)`)
     process.exit();
 }
 
 const query_components: Array<string> = [];
 var llm_query = "";
 
+var setting_filter_model = false
+var setting_batchsize = false
 for(const arg of program_args) {
+    if(setting_filter_model) {
+        FILTER_MODEL = arg;
+        setting_filter_model = false;
+        continue;
+    } else if (setting_batchsize) {
+        CARDS_PER_BATCH = parseInt(arg);
+        setting_batchsize = false;
+        continue;
+    }
+
     if(arg.startsWith("??")) {
         llm_query = arg.slice(2);
+        continue;
+    } else if (arg === "--model") {
+        setting_filter_model = true;
+        continue;
+    } else if (arg === "--batchsize") {
+        setting_batchsize = true;
         continue;
     }
 
@@ -98,15 +118,18 @@ function minimize_card(card: ScryfallCard.Any): SmallCard {
     return out;
 }
 
-async function process_card(card: ScryfallCard.Any) {
-    const small = minimize_card(card);
-
-    if(llm_query === "") {
-        console.log(small);
+var processing_buffer: Array<SmallCard> = [];
+async function process_buffer() {
+    if(processing_buffer.length === 0) {
         return;
     }
 
-    const prompt = base_prompt.replace("$QUERY", llm_query).replace("$CARD", JSON.stringify(small));
+    var cards: Array<string> = [];
+    for(var i = 0; i < processing_buffer.length; i++) {
+        cards.push(`${i}: ${JSON.stringify(processing_buffer[i])}`);
+    }
+
+    const prompt = base_prompt.replace("$QUERY", llm_query).replace("$CARDS", cards.join('\n'));
 
     const resp = await ollama.chat({
         model: FILTER_MODEL,
@@ -116,9 +139,31 @@ async function process_card(card: ScryfallCard.Any) {
         }]
     })
 
-    if(resp.message.content === "true") {
-        console.log(small);
+    try {
+        const selected = JSON.parse(resp.message.content);
+        for(const id of selected) {
+            console.log(processing_buffer[id]);
+        }
+    } catch(e) {
+        console.error(e);
+    } finally {
+        processing_buffer = [];
     }
+}
+
+async function process_card(card: ScryfallCard.Any) {
+    const small = minimize_card(card);
+
+    if(llm_query === "") {
+        console.log(small);
+        return;
+    }
+
+    if(processing_buffer.length === CARDS_PER_BATCH) {
+        await process_buffer();
+    }
+
+    processing_buffer.push(small);
 }
 
 const url_query = "https://api.scryfall.com/cards/search?q=" + query_components.join("+") + "&order=edhrec";
@@ -130,6 +175,7 @@ while(true) {
     }
 
     if(!list.has_more) {
+        await process_buffer();
         break;
     }
     list = await request_list(list.next_page);

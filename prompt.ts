@@ -1,17 +1,17 @@
 export default `
 # Card filter evaluator
 
-Determine if the given card object matches the given filter description:
+Determine which, if any, of the given card objects match the given filter description.
 
-"$QUERY"
+filter: "$QUERY"
 
 ## Output
-Return **only** \`true\` or \`false\`
+Return **only** a json array of card ids. If no cards match, return an empty list (\`[]\`).
 
 ===
 
-Card:
-\`\`\` card.json
-$CARD
+Cards:
+\`\`\`
+$CARDS
 \`\`\`
 `;
